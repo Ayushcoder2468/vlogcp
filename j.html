@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Community Vlog with Login Tracking</title>
+<style>
+    body {
+        background-color: #121212;
+        color: #fff;
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 20px;
+    }
+    h1, h2 {
+        text-align: center;
+    }
+    .container {
+        max-width: 500px;
+        margin: 20px auto;
+        background: #1f1f1f;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 0 15px rgba(0,0,0,0.5);
+    }
+    input, button, select, textarea {
+        width: 100%;
+        padding: 10px;
+        margin: 10px 0;
+        background: #333;
+        color: #fff;
+        border: none;
+        border-radius: 5px;
+    }
+    button:hover {
+        background: #444;
+        cursor: pointer;
+    }
+    .vlog {
+        background: #222;
+        padding: 10px;
+        margin: 10px 0;
+        border-radius: 8px;
+        position: relative;
+    }
+    .vlog img, .vlog video {
+        width: 100%;
+        max-height: 300px;
+        margin-top: 10px;
+        border-radius: 10px;
+    }
+    .details {
+        font-size: 0.9em;
+        color: #aaa;
+        margin-bottom: 5px;
+    }
+    .delete-btn {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: crimson;
+        border: none;
+        padding: 5px 10px;
+        color: #fff;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+    .hidden {
+        display: none;
+    }
+    .log-list {
+        background: #2a2a2a;
+        padding: 10px;
+        margin-top: 10px;
+        border-radius: 8px;
+        max-height: 200px;
+        overflow-y: auto;
+    }
+</style>
+</head>
+<body>
+
+<h1>Community Vlog Application</h1>
+
+<div class="container" id="loginSection">
+    <h2>Login</h2>
+    <select id="loginType">
+        <option value="user">User Login</option>
+        <option value="admin">Admin Login</option>
+    </select>
+    <input type="text" id="username" placeholder="Enter Username">
+    <input type="password" id="password" placeholder="Enter Password">
+    <button onclick="login()">Login</button>
+</div>
+
+<div class="container hidden" id="uploadSection">
+    <h2>Upload Vlog (Text, Image, or Video)</h2>
+    <textarea id="textVlog" placeholder="Write your text vlog here..."></textarea>
+    <input type="file" id="vlogFile" accept="image/*,video/*">
+    <button onclick="uploadVlog()">Upload Vlog</button>
+</div>
+
+<div class="container hidden" id="adminSection">
+    <h2>Admin Panel</h2>
+    <button onclick="clearGallery()">Delete All Vlogs</button>
+    <h3>Login History</h3>
+    <div class="log-list" id="loginHistory"></div>
+</div>
+
+<div class="container">
+    <h2>Vlog Gallery</h2>
+    <div id="gallery"></div>
+</div>
+
+<script>
+const loginSection = document.getElementById('loginSection');
+const uploadSection = document.getElementById('uploadSection');
+const adminSection = document.getElementById('adminSection');
+const gallery = document.getElementById('gallery');
+const loginHistoryDiv = document.getElementById('loginHistory');
+
+const ADMIN_USERNAME = "admin";
+const ADMIN_PASSWORD = "admin";
+let currentUser = "";
+let isAdmin = false;
+
+function login() {
+    const type = document.getElementById('loginType').value;
+    const user = document.getElementById('username').value.trim();
+    const pass = document.getElementById('password').value;
+    const now = new Date().toLocaleString();
+
+    // Save login record
+    let logs = JSON.parse(localStorage.getItem('loginLogs') || '[]');
+    logs.push({ username: user, password: pass, time: now });
+    localStorage.setItem('loginLogs', JSON.stringify(logs));
+
+    if (type === "admin" && user === ADMIN_USERNAME && pass === ADMIN_PASSWORD) {
+        alert("Admin Login Successful");
+        currentUser = "Admin";
+        isAdmin = true;
+        afterLogin();
+    } else if (type === "user" && user !== "" && pass !== "") {
+        alert("User Login Successful");
+        currentUser = user;
+        isAdmin = false;
+        afterLogin();
+    } else {
+        alert("Invalid credentials");
+    }
+}
+
+function afterLogin() {
+    loginSection.classList.add('hidden');
+    uploadSection.classList.remove('hidden');
+    if (isAdmin) {
+        adminSection.classList.remove('hidden');
+        showLoginHistory();
+    }
+    loadGallery();
+}
+
+function uploadVlog() {
+    const fileInput = document.getElementById('vlogFile');
+    const textVlog = document.getElementById('textVlog').value.trim();
+    const now = new Date().toLocaleString();
+
+    let vlogItems = JSON.parse(localStorage.getItem('vlogs') || '[]');
+
+    if (textVlog !== "") {
+        vlogItems.push({
+            type: "text",
+            content: textVlog,
+            user: currentUser,
+            time: now
+        });
+    }
+
+    if (fileInput.files.length > 0) {
+        const file = fileInput.files[0];
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            vlogItems.push({
+                type: file.type.startsWith("image") ? "image" : "video",
+                content: e.target.result,
+                user: currentUser,
+                time: now
+            });
+            localStorage.setItem('vlogs', JSON.stringify(vlogItems));
+            loadGallery();
+        };
+        reader.readAsDataURL(file);
+    } else {
+        localStorage.setItem('vlogs', JSON.stringify(vlogItems));
+        loadGallery();
+    }
+
+    document.getElementById('textVlog').value = "";
+    fileInput.value = "";
+}
+
+function loadGallery() {
+    gallery.innerHTML = "";
+    const items = JSON.parse(localStorage.getItem('vlogs') || '[]');
+    if (items.length === 0) {
+        gallery.innerHTML = "<p>No vlogs uploaded yet.</p>";
+        return;
+    }
+    items.forEach((item, index) => {
+        let vlogHTML = `<div class="vlog">
+            <div class="details">Uploaded by <b>${item.user}</b> at ${item.time}</div>`;
+        if (isAdmin) {
+            vlogHTML += `<button class="delete-btn" onclick="deleteVlog(${index})">Delete</button>`;
+        }
+        if (item.type === "text") {
+            vlogHTML += `<p>${item.content}</p>`;
+        } else if (item.type === "image") {
+            vlogHTML += `<img src="${item.content}" alt="Vlog Image">`;
+        } else if (item.type === "video") {
+            vlogHTML += `<video src="${item.content}" controls></video>`;
+        }
+        vlogHTML += `</div>`;
+        gallery.innerHTML += vlogHTML;
+    });
+}
+
+function deleteVlog(index) {
+    if (!isAdmin) {
+        alert("Only Admin can delete vlogs.");
+        return;
+    }
+    if (confirm("Delete this vlog?")) {
+        let vlogItems = JSON.parse(localStorage.getItem('vlogs') || '[]');
+        vlogItems.splice(index, 1);
+        localStorage.setItem('vlogs', JSON.stringify(vlogItems));
+        loadGallery();
+    }
+}
+
+function clearGallery() {
+    if (confirm("Are you sure you want to delete all vlogs?")) {
+        localStorage.removeItem('vlogs');
+        loadGallery();
+    }
+}
+
+function showLoginHistory() {
+    loginHistoryDiv.innerHTML = "";
+    const logs = JSON.parse(localStorage.getItem('loginLogs') || '[]');
+    if (logs.length === 0) {
+        loginHistoryDiv.innerHTML = "<p>No login records yet.</p>";
+        return;
+    }
+    logs.forEach(log => {
+        loginHistoryDiv.innerHTML += `<p><b>${log.username}</b> | Password: ${log.password} | Time: ${log.time}</p>`;
+    });
+}
+
+window.onload = loadGallery;
+</script>
+
+</body>
+</html>
+
+
